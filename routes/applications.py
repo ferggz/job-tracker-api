@@ -49,6 +49,7 @@ def create_application():
 def get_applications():
     status = request.args.get("status")
     company = request.args.get("company")
+    user_id = request.args.get("user_id")
     sort = request.args.get("sort", "created_at")
 
     query = "SELECT * FROM applications WHERE 1=1"
@@ -70,6 +71,10 @@ def get_applications():
     }
 
     sort_column = allowed_sort_fields.get(sort, "created_at")
+
+    if user_id:
+        query += " AND user_id = ?"
+        params.append(user_id)
 
     query += f" ORDER BY {sort_column} DESC"
 
