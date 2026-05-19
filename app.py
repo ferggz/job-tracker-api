@@ -4,6 +4,7 @@ from routes.auth import auth_bp
 from routes.applications import applications_bp
 
 app = Flask(__name__)
+app.secret_key = "dev-secret-key"
 
 init_db()
 

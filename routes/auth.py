@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash
 from database import get_db_connection
 
@@ -58,4 +58,18 @@ def login():
     if not check_password_hash(user["password"], password):
         return jsonify({"error": "Invalid username or password"}), 401
 
-    return jsonify({"message": "Login successful"}), 200
+    session["user_id"] = user["id"]
+
+    return jsonify({
+        "message": "Login successful",
+        "user": {
+            "id": user["id"],
+            "username": user["username"]
+        }
+    }), 200
+
+
+@auth_bp.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"message": "Logged out successfully"}), 200

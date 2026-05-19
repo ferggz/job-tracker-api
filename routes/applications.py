@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from database import get_db_connection
 
 applications_bp = Blueprint("applications", __name__)
@@ -12,13 +12,28 @@ ALLOWED_STATUSES = [
 ]
 
 
+def application_to_dict(application):
+    return {
+        "id": application["id"],
+        "user_id": application["user_id"],
+        "company": application["company"],
+        "position": application["position"],
+        "location": application["location"],
+        "remote_type": application["remote_type"],
+        "status": application["status"],
+        "applied_date": application["applied_date"],
+        "notes": application["notes"],
+        "created_at": application["created_at"]
+    }
+
+
 from datetime import datetime
 
 @applications_bp.route("/applications", methods=["POST"])
 def create_application():
     data = request.get_json()
 
-    user_id = data.get("user_id")
+    user_id = session.get("user_id")
     company = data.get("company")
     position = data.get("position")
     location = data.get("location")
@@ -31,8 +46,11 @@ def create_application():
 
     notes = data.get("notes")
 
-    if not user_id or not company or not position:
-        return jsonify({"error": "user_id, company and position are required"}), 400
+    if not user_id:
+        return jsonify({"error": "You must be logged in"}), 401
+
+    if not company or not position:
+        return jsonify({"error": "company and position are required"}), 400
 
     if status not in ALLOWED_STATUSES:
         return jsonify({"error": "Invalid status"}), 400
@@ -88,7 +106,11 @@ def get_applications():
         return jsonify({"error": "Invalid status filter"}), 400
 
     company = request.args.get("company")
-    user_id = request.args.get("user_id")
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "You must be logged in"}), 401
+    
     sort = request.args.get("sort", "created_at")
 
     query = "SELECT * FROM applications WHERE 1=1"
@@ -123,12 +145,15 @@ def get_applications():
 
     applications_list = [application_to_dict(application) for application in applications]
 
-    return jsonify(application_to_dict(application)), 200
+    return jsonify(applications_list), 200
 
 
 @applications_bp.route("/applications/summary", methods=["GET"])
 def get_applications_summary():
-    user_id = request.args.get("user_id")
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "You must be logged in"}), 401
 
     query = """
         SELECT status, COUNT(*) as total
@@ -137,9 +162,8 @@ def get_applications_summary():
     """
     params = []
 
-    if user_id:
-        query += " AND user_id = ?"
-        params.append(user_id)
+    query += " AND user_id = ?"
+    params.append(user_id)
 
     query += " GROUP BY status"
 
@@ -167,9 +191,14 @@ def get_applications_summary():
 def get_application(application_id):
     conn = get_db_connection()
 
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"error": "You must be logged in"}), 401
+
     application = conn.execute(
-        "SELECT * FROM applications WHERE id = ?",
-        (application_id,)
+        "SELECT * FROM applications WHERE id = ? AND user_id = ?",
+        (application_id, user_id)
     ).fetchone()
 
     conn.close()
@@ -211,9 +240,15 @@ def update_application(application_id):
 
     conn = get_db_connection()
 
+    user_id = session.get("user_id")
+
+    if not user_id:
+        conn.close()
+        return jsonify({"error": "You must be logged in"}), 401
+
     application = conn.execute(
-        "SELECT * FROM applications WHERE id = ?",
-        (application_id,)
+        "SELECT * FROM applications WHERE id = ? AND user_id = ?",
+        (application_id, user_id)
     ).fetchone()
 
     if application is None:
@@ -251,9 +286,15 @@ def update_application(application_id):
 def delete_application(application_id):
     conn = get_db_connection()
 
+    user_id = session.get("user_id")
+
+    if not user_id:
+        conn.close()
+        return jsonify({"error": "You must be logged in"}), 401
+
     application = conn.execute(
-        "SELECT * FROM applications WHERE id = ?",
-        (application_id,)
+        "SELECT * FROM applications WHERE id = ? AND user_id = ?",
+        (application_id, user_id)
     ).fetchone()
 
     if application is None:
