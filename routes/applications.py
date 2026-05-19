@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, session
 from database import get_db_connection
+from utils.auth import login_required
 
 applications_bp = Blueprint("applications", __name__)
 
@@ -30,6 +31,7 @@ def application_to_dict(application):
 from datetime import datetime
 
 @applications_bp.route("/applications", methods=["POST"])
+@login_required
 def create_application():
     data = request.get_json()
 
@@ -45,9 +47,6 @@ def create_application():
         applied_date = datetime.now().strftime("%Y-%m-%d")
 
     notes = data.get("notes")
-
-    if not user_id:
-        return jsonify({"error": "You must be logged in"}), 401
 
     if not company or not position:
         return jsonify({"error": "company and position are required"}), 400
@@ -99,6 +98,7 @@ def create_application():
 
 
 @applications_bp.route("/applications", methods=["GET"])
+@login_required
 def get_applications():
     status = request.args.get("status")
     
@@ -107,9 +107,6 @@ def get_applications():
 
     company = request.args.get("company")
     user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({"error": "You must be logged in"}), 401
     
     sort = request.args.get("sort", "created_at")
 
@@ -149,11 +146,9 @@ def get_applications():
 
 
 @applications_bp.route("/applications/summary", methods=["GET"])
+@login_required
 def get_applications_summary():
     user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({"error": "You must be logged in"}), 401
 
     query = """
         SELECT status, COUNT(*) as total
@@ -188,13 +183,11 @@ def get_applications_summary():
 
 
 @applications_bp.route("/applications/<int:application_id>", methods=["GET"])
+@login_required
 def get_application(application_id):
     conn = get_db_connection()
 
     user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({"error": "You must be logged in"}), 401
 
     application = conn.execute(
         "SELECT * FROM applications WHERE id = ? AND user_id = ?",
@@ -221,6 +214,7 @@ def get_application(application_id):
 
 
 @applications_bp.route("/applications/<int:application_id>", methods=["PUT"])
+@login_required
 def update_application(application_id):
     data = request.get_json()
 
@@ -241,10 +235,6 @@ def update_application(application_id):
     conn = get_db_connection()
 
     user_id = session.get("user_id")
-
-    if not user_id:
-        conn.close()
-        return jsonify({"error": "You must be logged in"}), 401
 
     application = conn.execute(
         "SELECT * FROM applications WHERE id = ? AND user_id = ?",
@@ -283,14 +273,11 @@ def update_application(application_id):
 
 
 @applications_bp.route("/applications/<int:application_id>", methods=["DELETE"])
+@login_required
 def delete_application(application_id):
     conn = get_db_connection()
 
     user_id = session.get("user_id")
-
-    if not user_id:
-        conn.close()
-        return jsonify({"error": "You must be logged in"}), 401
 
     application = conn.execute(
         "SELECT * FROM applications WHERE id = ? AND user_id = ?",
