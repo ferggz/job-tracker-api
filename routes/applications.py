@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from database import get_db_connection
 from utils.auth import login_required
+from datetime import datetime
 
 applications_bp = Blueprint("applications", __name__)
 
@@ -24,11 +25,10 @@ def application_to_dict(application):
         "status": application["status"],
         "applied_date": application["applied_date"],
         "notes": application["notes"],
-        "created_at": application["created_at"]
+        "created_at": application["created_at"],
+        "updated_at": application["updated_at"]
     }
 
-
-from datetime import datetime
 
 @applications_bp.route("/applications", methods=["POST"])
 @login_required
@@ -42,6 +42,7 @@ def create_application():
     remote_type = data.get("remote_type")
     status = data.get("status", "saved")
     applied_date = data.get("applied_date")
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if not applied_date:
         applied_date = datetime.now().strftime("%Y-%m-%d")
@@ -53,20 +54,6 @@ def create_application():
 
     if status not in ALLOWED_STATUSES:
         return jsonify({"error": "Invalid status"}), 400
-    
-    def application_to_dict(application):
-        return {
-            "id": application["id"],
-            "user_id": application["user_id"],
-            "company": application["company"],
-            "position": application["position"],
-            "location": application["location"],
-            "remote_type": application["remote_type"],
-            "status": application["status"],
-            "applied_date": application["applied_date"],
-            "notes": application["notes"],
-            "created_at": application["created_at"]
-        }
     
     conn = get_db_connection()
 
@@ -81,9 +68,9 @@ def create_application():
 
     cursor = conn.execute("""
         INSERT INTO applications 
-        (user_id, company, position, location, remote_type, status, applied_date, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (user_id, company, position, location, remote_type, status, applied_date, notes))
+        (user_id, company, position, location, remote_type, status, applied_date, notes, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, company, position, location, remote_type, status, applied_date, notes, updated_at))
 
     conn.commit()
 
@@ -199,18 +186,7 @@ def get_application(application_id):
     if application is None:
         return jsonify({"error": "Application not found"}), 404
 
-    return jsonify({
-        "id": application["id"],
-        "user_id": application["user_id"],
-        "company": application["company"],
-        "position": application["position"],
-        "location": application["location"],
-        "remote_type": application["remote_type"],
-        "status": application["status"],
-        "applied_date": application["applied_date"],
-        "notes": application["notes"],
-        "created_at": application["created_at"]
-    }), 200
+    return jsonify(application_to_dict(application)), 200
 
 
 @applications_bp.route("/applications/<int:application_id>", methods=["PUT"])
@@ -245,15 +221,19 @@ def update_application(application_id):
         conn.close()
         return jsonify({"error": "Application not found"}), 404
 
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     conn.execute("""
         UPDATE applications
-        SET company = ?,
+        SET
+            company = ?,
             position = ?,
             location = ?,
             remote_type = ?,
             status = ?,
             applied_date = ?,
-            notes = ?
+            notes = ?,
+            updated_at = ?
         WHERE id = ?
     """, (
         company,
@@ -263,6 +243,7 @@ def update_application(application_id):
         status,
         applied_date,
         notes,
+        updated_at,
         application_id
     ))
 
